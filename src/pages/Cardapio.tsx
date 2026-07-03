@@ -1,79 +1,44 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import API_URL from "../services/api";
 
 type Produto = {
+  id: number;
   nome: string;
   categoria: string;
-  preco: number;
   descricao: string;
+  preco: number;
+  disponivel: boolean;
+  imagem?: string | null;
 };
 
 type ItemCarrinho = Produto & {
   quantidade: number;
 };
 
-const produtos: Produto[] = [
-  {
-    nome: "Jantinha com 2 Espetos",
-    categoria: "Jantinhas",
-    preco: 29.9,
-    descricao: "Arroz, acompanhamentos e 2 espetos à escolha.",
-  },
-  {
-    nome: "Mc'and Cheese Bacon e Calabresa",
-    categoria: "Massas",
-    preco: 29.9,
-    descricao: "Macarrão cremoso com bacon e calabresa em cubinhos.",
-  },
-  {
-    nome: "Mc'and Cheese Frango",
-    categoria: "Massas",
-    preco: 29.9,
-    descricao: "Macarrão cremoso com frango desfiado.",
-  },
-  {
-    nome: "Espaguete à Bolonhesa",
-    categoria: "Massas",
-    preco: 29.9,
-    descricao: "Espaguete com molho à bolonhesa e cheiro-verde.",
-  },
-  {
-    nome: "Caldo de Kenga",
-    categoria: "Caldos",
-    preco: 18,
-    descricao: "Caldo cremoso com frango desfiado, bacon e calabresa.",
-  },
-  {
-    nome: "Vaca Atolada",
-    categoria: "Caldos",
-    preco: 20,
-    descricao: "Caldo tradicional com mandioca e carne.",
-  },
-  {
-    nome: "Coca-Cola 310ml",
-    categoria: "Bebidas",
-    preco: 7,
-    descricao: "Lata 310ml gelada.",
-  },
-  {
-    nome: "Água Mineral",
-    categoria: "Bebidas",
-    preco: 5,
-    descricao: "Água mineral sem gás.",
-  },
-  {
-    nome: "Açaí 300ml",
-    categoria: "Açaí",
-    preco: 15,
-    descricao: "Açaí cremoso no copo de 300ml.",
-  },
-];
-
 export default function Cardapio() {
+  const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([]);
   const [nomeCliente, setNomeCliente] = useState("");
   const [tipoPedido, setTipoPedido] = useState("Retirada");
   const [endereco, setEndereco] = useState("");
   const [observacao, setObservacao] = useState("");
+
+  useEffect(() => {
+    carregarProdutos();
+  }, []);
+
+  async function carregarProdutos() {
+    const resposta = await fetch(`${API_URL}/produtos`);
+    const dados = await resposta.json();
+    setProdutos(dados.filter((produto: Produto) => produto.disponivel));
+  }
+
+  function imagemUrl(caminho?: string | null) {
+    if (!caminho) return "";
+    return `${API_URL}${caminho}`;
+  }
+
+  const categorias = Array.from(new Set(produtos.map((p) => p.categoria)));
 
   const total = carrinho.reduce(
     (soma, item) => soma + item.preco * item.quantidade,
@@ -81,12 +46,12 @@ export default function Cardapio() {
   );
 
   function adicionar(produto: Produto) {
-    const existe = carrinho.find((item) => item.nome === produto.nome);
+    const existe = carrinho.find((item) => item.id === produto.id);
 
     if (existe) {
       setCarrinho(
         carrinho.map((item) =>
-          item.nome === produto.nome
+          item.id === produto.id
             ? { ...item, quantidade: item.quantidade + 1 }
             : item
         )
@@ -96,20 +61,18 @@ export default function Cardapio() {
     }
   }
 
-  function diminuir(nome: string) {
+  function diminuir(id: number) {
     setCarrinho(
       carrinho
         .map((item) =>
-          item.nome === nome
-            ? { ...item, quantidade: item.quantidade - 1 }
-            : item
+          item.id === id ? { ...item, quantidade: item.quantidade - 1 } : item
         )
         .filter((item) => item.quantidade > 0)
     );
   }
 
-  function remover(nome: string) {
-    setCarrinho(carrinho.filter((item) => item.nome !== nome));
+  function remover(id: number) {
+    setCarrinho(carrinho.filter((item) => item.id !== id));
   }
 
   function finalizarPedido() {
@@ -126,7 +89,9 @@ export default function Cardapio() {
     const itens = carrinho
       .map(
         (item) =>
-          `${item.quantidade}x ${item.nome} - R$ ${(item.preco * item.quantidade)
+          `${item.quantidade}x ${item.nome} - R$ ${(
+            item.preco * item.quantidade
+          )
             .toFixed(2)
             .replace(".", ",")}`
       )
@@ -148,15 +113,47 @@ export default function Cardapio() {
         <p>Cardápio Digital</p>
       </header>
 
-      {["Jantinhas", "Massas", "Caldos", "Bebidas", "Açaí"].map((categoria) => (
+      {categorias.length === 0 && <p>Nenhum produto disponível no momento.</p>}
+
+      {categorias.map((categoria) => (
         <section key={categoria}>
           <h2>{categoria}</h2>
 
           {produtos
             .filter((produto) => produto.categoria === categoria)
             .map((produto) => (
-              <div className="produto-card" key={produto.nome}>
-                <div>
+              <div className="produto-card" key={produto.id}>
+                {produto.imagem ? (
+                  <img
+                    src={imagemUrl(produto.imagem)}
+                    alt={produto.nome}
+                    style={{
+                      width: 120,
+                      height: 90,
+                      objectFit: "cover",
+                      borderRadius: 12,
+                      marginRight: 16,
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 120,
+                      height: 90,
+                      borderRadius: 12,
+                      background: "#eee",
+                      marginRight: 16,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#777",
+                    }}
+                  >
+                    Sem foto
+                  </div>
+                )}
+
+                <div style={{ flex: 1 }}>
                   <h3>{produto.nome}</h3>
                   <p>{produto.descricao}</p>
                   <strong>R$ {produto.preco.toFixed(2).replace(".", ",")}</strong>
@@ -175,15 +172,15 @@ export default function Cardapio() {
           <p>Nenhum item adicionado.</p>
         ) : (
           carrinho.map((item) => (
-            <div className="carrinho-item" key={item.nome}>
+            <div className="carrinho-item" key={item.id}>
               <span>
                 {item.quantidade}x {item.nome}
               </span>
 
               <div>
-                <button onClick={() => diminuir(item.nome)}>-</button>
+                <button onClick={() => diminuir(item.id)}>-</button>
                 <button onClick={() => adicionar(item)}>+</button>
-                <button onClick={() => remover(item.nome)}>Remover</button>
+                <button onClick={() => remover(item.id)}>Remover</button>
               </div>
             </div>
           ))
